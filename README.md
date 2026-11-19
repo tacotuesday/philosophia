@@ -32,6 +32,16 @@ Download the file ending in `-linux-x86_64.AppImage` and move it to a folder whe
 
 The reading queue orders available readings by priority, then by reading date. Card review serves overdue and ready cards before new cards. FSRS uses a desired retention of 90% and short-term learning and relearning steps. The calendar counts each introduced card once, on its next scheduled day. New cards appear in their own count. Study days begin at 4 am in the system’s local time zone.
 
+### From a highlight to a cloze card
+
+In the reader, highlight the sentence you want to remember. Philosophia saves it as an extract and keeps the highlight visible in the article.
+
+![Reader showing the highlighted sentence “The distance light travels in one year is called a light-year.”](docs/images/reader-highlight.png)
+
+Open that extract, select **light-year**, and choose **Make cloze**. After you save the card, **Card review** shows the same sentence with the term hidden. Press **Space** to reveal it.
+
+![Card review showing “The distance light travels in one year is called a […].” above the Show answer button](docs/images/cloze-review.png)
+
 ## Run from source
 
 Use Node.js 22.18 or newer and npm. From the project directory:
