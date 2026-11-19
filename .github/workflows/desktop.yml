@@ -1,0 +1,65 @@
+name: Desktop packages
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            name: windows-x64
+            target: --win nsis --x64
+            executable: release/win-unpacked/Philosophia.exe
+            artifact: release/*.exe
+          - runner: macos-15
+            name: macos-arm64
+            target: --mac dmg --arm64
+            executable: release/mac-arm64/Philosophia.app/Contents/MacOS/Philosophia
+            artifact: release/*.dmg
+          - runner: macos-15-intel
+            name: macos-x64
+            target: --mac dmg --x64
+            executable: release/mac/Philosophia.app/Contents/MacOS/Philosophia
+            artifact: release/*.dmg
+          - runner: ubuntu-24.04
+            name: linux-x64
+            target: --linux AppImage --x64
+            executable: release/linux-unpacked/philosophia
+            artifact: release/*.AppImage
+    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run dist -- ${{ matrix.target }} --publish never
+      - name: Exercise packaged app
+        if: runner.os != 'Linux'
+        run: npm run test:desktop
+        env:
+          PHILOSOPHIA_EXECUTABLE: ${{ matrix.executable }}
+      - name: Exercise packaged app on a virtual display
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root release/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 release/linux-unpacked/chrome-sandbox
+          xvfb-run -a npm run test:desktop
+        env:
+          PHILOSOPHIA_EXECUTABLE: ${{ matrix.executable }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Philosophia-${{ matrix.name }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
