@@ -2,6 +2,24 @@
 
 Philosophia is an MIT-licensed desktop app for incremental reading and spaced repetition on Windows, macOS, and Linux. It keeps articles, images, highlights, and review history on your computer.
 
+## Download and install
+
+**[Download the latest release](https://github.com/tacotuesday/philosophia/releases/latest)** and choose the file for your computer under **Assets**.
+
+### Windows (x64)
+
+Download the file ending in `-win-x64.exe` and double-click it to install Philosophia. After installation, open **Philosophia** from the Start menu. Windows may show an unknown-publisher prompt for the unsigned v0.1.0 installer.
+
+### macOS (Apple silicon or Intel)
+
+1. Open the Apple menu and choose **About This Mac**. If **Chip** lists an Apple M-series chip, download the file ending in `-mac-arm64.dmg`. If **Processor** lists Intel, choose `-mac-x64.dmg`.
+2. Open the downloaded disk image and drag **Philosophia** into **Applications**.
+3. Eject the disk image and open **Philosophia** from **Applications**. The v0.1.0 builds are ad-hoc signed and unnotarized. If macOS blocks the first launch, see [Apple’s guide to opening downloaded apps](https://support.apple.com/en-us/102445).
+
+### Linux (x86-64)
+
+Download the file ending in `-linux-x86_64.AppImage` and move it to a folder where you want to keep it. In your file manager, open the file’s **Properties**, enable permission to run it as a program, then double-click it to launch Philosophia. The app requires a desktop that supports the Chromium sandbox.
+
 ## Start learning
 
 1. Open **Web browser**, enter an HTTP or HTTPS address, and choose **Save article**. You can also select text and choose **Highlight selection**, or choose **Save image** and click an image on the page. Escape cancels image selection.
@@ -35,7 +53,7 @@ npm run dist -- --mac dmg --x64 --publish never
 npm run dist -- --linux AppImage --x64 --publish never
 ```
 
-Packages are written to `release/`. On macOS, open the matching disk image and drag Philosophia into Applications. On Windows, run the installer. On Linux, mark the AppImage executable and launch it on a desktop that supports the Chromium sandbox. Development builds use ad-hoc signing on macOS and unsigned installers on Windows. macOS builds are unnotarized.
+Packages are written to `release/`.
 
 ## Verify the workflow
 
