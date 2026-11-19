@@ -2,6 +2,8 @@
 
 Philosophia is an MIT-licensed desktop app for incremental reading and spaced repetition on Windows, macOS, and Linux. It keeps articles, images, highlights, and review history on your computer.
 
+![Philosophia’s Study desk showing card review, the reading queue, the review calendar, and recent readings](docs/images/study-desk.png)
+
 ## Download and install
 
 **[Download the latest release](https://github.com/tacotuesday/philosophia/releases/latest)** and choose the file for your computer under **Assets**.
