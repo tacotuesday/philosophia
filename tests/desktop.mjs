@@ -16,13 +16,17 @@ const fixture =
   phrase +
   '</p><p>These notes compare two samples under different light conditions. The second sample is the one we will return to after closing the browser.</p><p id="target">' +
   phrase +
-  '</p><figure><img src="/leaf.png" alt="Leaf sample"><figcaption>Leaf sample</figcaption></figure></article><form><label id="aside">Observation outside the article</label></form></body></html>'
+  '</p><figure><img src="/leaf.png" alt="Leaf sample"><figcaption>Leaf sample</figcaption></figure></article><form><label id="aside">Observation outside the article</label></form><iframe hidden src="/slow-frame"></iframe></body></html>'
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aRPkAAAAASUVORK5CYII=',
   'base64'
 )
+let slowFrame
 const server = createServer((req, res) => {
-  if (req.url === '/leaf.png') {
+  if (req.url === '/slow-frame') {
+    // Keep window.load pending after the article text becomes selectable.
+    slowFrame = res
+  } else if (req.url === '/leaf.png') {
     res.writeHead(200, { 'Content-Type': 'image/png' })
     res.end(png)
   } else {
@@ -152,11 +156,11 @@ try {
   await button('Go').click()
   await until(async () => {
     try {
-      return await guest('document.readyState === "complete"')
+      return slowFrame && (await guest('document.readyState === "interactive"'))
     } catch {
       return false
     }
-  }, 'loading the embedded page')
+  }, 'showing the article while an embedded frame is still loading')
   assert.equal(
     await guest('typeof window.desk+":"+typeof window.require'),
     'undefined:undefined'
@@ -168,6 +172,12 @@ try {
   )
   await button('Highlight selection').click()
   await page.getByText('Highlight saved to your library').waitFor()
+  await until(
+    () => guest('CSS.highlights.get("philosophia-saved")?.size === 1'),
+    'marking the saved range on the still-loading page'
+  )
+  assert.equal(await guest('document.readyState'), 'interactive')
+  slowFrame.end()
   const extract = await page.evaluate(
     async () =>
       (await window.desk.invoke('library')).find((x) => x.kind === 'extract').id

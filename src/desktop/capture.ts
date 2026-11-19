@@ -1,20 +1,20 @@
 import { Readability } from '@mozilla/readability'
-import type { Block, CaptureMode, Snapshot } from '../shared/model'
+import { ipcRenderer, webFrame } from 'electron'
+import type { Block, CaptureMode, CaptureReply, Snapshot } from '../shared/model'
 
-// Runs only in the isolated world of the browser view. No desktop API is exposed here.
+// This sandboxed guest preload accepts capture requests only from the main process.
 let cancelPicker: (() => void) | undefined
-export function cancel() {
-  cancelPicker?.()
-}
-export function rememberSelection() {
-  const selection = window.getSelection()
-  if (!selection?.rangeCount || selection.isCollapsed) return
+function rememberSelection(range: Range) {
   const saved = CSS.highlights.get('philosophia-saved') ?? new Highlight()
-  saved.add(selection.getRangeAt(0).cloneRange())
+  if (!saved.size)
+    webFrame.insertCSS(
+      '::highlight(philosophia-saved){background-color:#e6dc9a;color:#253526}'
+    )
+  saved.add(range)
   CSS.highlights.set('philosophia-saved', saved)
 }
-export function pickImage(): Promise<number | null> {
-  cancel()
+function pickImage(): Promise<number | null> {
+  cancelPicker?.()
   return new Promise((resolve) => {
     const old = document.documentElement.style.cursor
     document.documentElement.style.cursor = 'crosshair'
@@ -51,7 +51,7 @@ function twin(original: Node, copy: Document): Node | null {
     copy
   )
 }
-export function snapshot(mode: CaptureMode, chosen = -1): Snapshot {
+function snapshot(mode: CaptureMode, chosen = -1): Snapshot {
   const selection = window.getSelection()
   const quote = mode === 'highlight' ? selection?.toString() : undefined
   if (mode === 'highlight' && (!quote?.trim() || !selection?.rangeCount))
@@ -196,3 +196,20 @@ export function snapshot(mode: CaptureMode, chosen = -1): Snapshot {
     imageIndex
   }
 }
+
+ipcRenderer.on('cancel-image-pick', () => cancelPicker?.())
+ipcRenderer.on('capture-page', async ({ ports: [port] }, mode: CaptureMode) => {
+  let reply: CaptureReply
+  try {
+    const index = mode === 'image' ? await pickImage() : -1
+    reply = { snapshot: index === null ? null : snapshot(mode, index) }
+    if (mode === 'highlight') {
+      const range = window.getSelection()!.getRangeAt(0).cloneRange()
+      // The main process acknowledges this particular range after committing it.
+      port.onmessage = () => rememberSelection(range)
+    }
+  } catch (error) {
+    reply = { error: error instanceof Error ? error.message : String(error) }
+  }
+  port.postMessage(reply)
+})

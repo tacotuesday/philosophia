@@ -18,6 +18,7 @@ export type Snapshot = {
   quote?: string
   imageIndex?: number
 }
+export type CaptureReply = { snapshot: Snapshot | null } | { error: string }
 export type Entry = {
   id: number
   kind: 'article' | 'extract'

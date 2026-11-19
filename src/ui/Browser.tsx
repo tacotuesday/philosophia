@@ -78,7 +78,7 @@ export function Browser({
       window.removeEventListener('resize', place)
       void call('bounds', null)
     }
-  }, [visible, mode, saved, captureError])
+  }, [visible])
   function navigate(value: string) {
     let url = value.trim()
     if (!url) return

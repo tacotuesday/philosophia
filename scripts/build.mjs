@@ -6,7 +6,7 @@ const icon = new Resvg(await readFile('build/icon.svg')).render().asPng()
 await writeFile('build/icon.png', icon)
 const base = { bundle: true, minify: false, logLevel: 'warning' }
 await Promise.all([
-  ...['main', 'preload'].map((name) =>
+  ...['main', 'preload', 'capture'].map((name) =>
     build({
       ...base,
       entryPoints: ['src/desktop/' + name + '.ts'],
@@ -17,14 +17,6 @@ await Promise.all([
       outfile: 'dist/' + name + '.cjs'
     })
   ),
-  build({
-    ...base,
-    entryPoints: ['src/desktop/capture.ts'],
-    platform: 'browser',
-    format: 'iife',
-    globalName: 'PageCapture',
-    outfile: 'dist/capture.js'
-  }),
   build({
     ...base,
     entryPoints: ['src/ui/index.tsx'],

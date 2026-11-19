@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   ipcMain,
   Menu,
+  MessageChannelMain,
   protocol,
   session,
   WebContentsView
@@ -15,6 +16,7 @@ import {
   webURL,
   type BrowserState,
   type CaptureMode,
+  type CaptureReply,
   type Commands,
   type Command,
   type Bounds,
@@ -50,6 +52,7 @@ async function windowForStudy() {
   })
   const guest = new WebContentsView({
     webPreferences: {
+      preload: join(__dirname, 'capture.cjs'),
       partition: 'persist:philosophia-browser',
       sandbox: true,
       contextIsolation: true,
@@ -88,6 +91,7 @@ async function windowForStudy() {
     requested = '',
     attached = false,
     generation = 0
+  let interruptCapture: ((error: Error) => void) | undefined
   const state = (): BrowserState => ({
     url:
       web.getURL() && web.getURL() !== 'chrome-error://chromewebdata/'
@@ -125,6 +129,7 @@ async function windowForStudy() {
   web.on('did-start-navigation', (_e, _url, inPlace, main) => {
     if (main && !inPlace) {
       generation++
+      interruptCapture?.(Error('The page changed during capture.'))
       error = ''
     }
     publish()
@@ -136,15 +141,12 @@ async function windowForStudy() {
       publish()
     }
   })
-  const code = await readFile(join(__dirname, 'capture.js'), 'utf8')
-  const runGuest = (js: string) =>
-    web.executeJavaScriptInIsolatedWorld(1001, [{ code: js }])
   function bounds(rect: Bounds | null) {
     if (!rect) {
       if (attached) {
         win.contentView.removeChildView(guest)
         attached = false
-        void runGuest('globalThis.PageCapture?.cancel()').catch(() => {})
+        web.send('cancel-image-pick')
       }
       return
     }
@@ -168,32 +170,41 @@ async function windowForStudy() {
       error
     )
       throw Error('Open a web page first.')
+    if (interruptCapture) throw Error('A capture is already in progress.')
     const version = generation
-    await runGuest(code)
-    let index = -1
-    if (mode === 'image') {
-      const choice = await runGuest('PageCapture.pickImage()')
-      if (choice == null) return null
-      index = Number(choice)
-    }
-    if (generation !== version)
-      throw Error('The page changed. Select the passage again.')
-    const snap: Snapshot = await runGuest(
-      'PageCapture.snapshot(' + JSON.stringify(mode) + ',' + index + ')'
-    )
-    if (generation !== version || snap.url !== web.getURL())
-      throw Error('The page changed during capture.')
-    const saved = store.capture(snap, mode)
-    if (mode === 'highlight' && generation === version) {
-      await web
-        .insertCSS(
-          '::highlight(philosophia-saved){background-color:#e6dc9a;color:#253526}'
+    const { port1, port2 } = new MessageChannelMain()
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      // The guest preload can read visible text while subresources are still loading.
+      const snap = await new Promise<Snapshot | null>((resolve, reject) => {
+        interruptCapture = reject
+        if (mode !== 'image')
+          timeout = setTimeout(
+            () => reject(Error('The page took too long to capture. Try again.')),
+            15000
+          )
+        port1.once('message', ({ data }: { data: CaptureReply }) => {
+          if ('error' in data) reject(Error(data.error))
+          else resolve(data.snapshot)
+        })
+        port1.once('close', () =>
+          reject(Error('The page closed during capture.'))
         )
-        .catch(() => {})
-      await runGuest('PageCapture.rememberSelection()').catch(() => {})
+        port1.start()
+        web.mainFrame.postMessage('capture-page', mode, [port2])
+      })
+      if (!snap) return null
+      if (generation !== version || snap.url !== web.getURL())
+        throw Error('The page changed during capture.')
+      const saved = store.capture(snap, mode)
+      if (mode === 'highlight') port1.postMessage('saved')
+      void cache.queue(saved.assets)
+      return saved.id
+    } finally {
+      clearTimeout(timeout)
+      interruptCapture = undefined
+      port1.close()
     }
-    void cache.queue(saved.assets)
-    return saved.id
   }
   const commands: {
     [K in Command]: (
@@ -225,9 +236,7 @@ async function windowForStudy() {
     },
     browser: state,
     capture,
-    cancelPick: async () => {
-      await runGuest('globalThis.PageCapture?.cancel()')
-    },
+    cancelPick: () => web.send('cancel-image-pick'),
     retry: (id) => cache.save(id)
   }
   ipcMain.handle('desk', (event, key: Command, ...args: unknown[]) => {
